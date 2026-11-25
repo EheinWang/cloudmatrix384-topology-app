@@ -1,16 +1,16 @@
 (() => {
 'use strict';
 const $=id=>document.getElementById(id),M=CMModel,D=CM_DATA,NS='http://www.w3.org/2000/svg';
-const planeColors=['#567ec3','#47899b','#9671b3','#ba8261','#627ba5','#66927b','#927a99'];
+const planeColors=['#2768b2','#008576','#8860a3','#b77720','#367d94','#b64b61','#6167ac'];
 const state={sources:['n48:d0'],targets:['n42:d0'],group:'sources',granularity:'die',host:48,layout:'logical',mode:'pairs',operation:'read',transport:'ub',rate:'paper',planes:7,bytes:67108864,background:'none',backgroundPct:0,planeFocus:'all',allLinks:false,cpuLinks:false};
-let autoFit=true;let result=null,positions={},drag=null,view={x:0,y:0,k:1},world={w:3180,h:2090},toastTimer;
+let inspectedDie='n48:d0',readableZoom=false;let autoFit=true;let result=null,positions={},drag=null,view={x:0,y:0,k:1},world={w:3180,h:2090},toastTimer;
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function el(type,attrs={},text){const n=document.createElementNS(NS,type);for(const[k,v]of Object.entries(attrs))n.setAttribute(k,v);if(text!==undefined)n.textContent=text;return n}
 function add(parent,type,attrs,text){const n=el(type,attrs,text);parent.appendChild(n);return n}
 function fmt(n,d=2){return Number.isFinite(n)?n.toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d}):'∞'}
 function bytes(n){if(n>=2**30)return fmt(n/2**30)+' GiB';if(n>=2**20)return fmt(n/2**20)+' MiB';return fmt(n/2**10)+' KiB'}
 function toast(text){$('toast').textContent=text;$('toast').classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').classList.remove('show'),2600)}
-function applyView(){$('viewport').setAttribute('transform',`translate(${view.x} ${view.y}) scale(${view.k})`)}
+function applyView(){$('viewport').setAttribute('transform',`translate(${view.x} ${view.y}) scale(${view.k})`);const readable=view.k>=2.2;$('topology').classList.toggle('port-labels-visible',readable);if(readable!==readableZoom){readableZoom=readable;drawLinks()}}
 function fit(){autoFit=true;const r=$('svgShell').getBoundingClientRect();view.k=Math.min((r.width-30)/world.w,(r.height-35)/world.h);view.x=(r.width-world.w*view.k)/2;view.y=10;applyView()}
 function zoom(f,x,y){autoFit=false;const r=$('svgShell').getBoundingClientRect();x??=r.width/2;y??=r.height/2;const k=Math.max(.09,Math.min(4.5,view.k*f));view.x=x-(x-view.x)*k/view.k;view.y=y-(y-view.y)*k/view.k;view.k=k;applyView()}
 function focusHost(h){autoFit=false;const p=positions['n'+h],r=$('svgShell').getBoundingClientRect();view.k=Math.min((r.width-45)/p.w,(r.height-50)/p.h,2);view.x=(r.width-p.w*view.k)/2-p.x*view.k;view.y=(r.height-p.h*view.k)/2-p.y*view.k;applyView()}
@@ -39,13 +39,13 @@ function drawTopology(){
   const g=add(root,'g',{'data-host':h});add(back,'rect',{x:nx,y:ny,width:w,height:q.h,rx:9,fill:'#fff',stroke:'#bfced8','stroke-width':h===state.host?2.6:1.2,class:h===state.host?'server-focus':''});
   add(g,'text',{x:nx+13,y:ny+23,'font-size':18,'font-weight':700,class:'node-label','data-kind':'host','data-host':h},`N${String(h).padStart(2,'0')}`);
   add(g,'text',{x:nx+w-14,y:ny+22,'font-size':11,'text-anchor':'end',class:'svg-sub'},'8 × 910C / 4 × CPU');
-  for(let p=0;p<7;p++){const x=nx+14+p*(w-28)/7,pw=(w-35)/7-3;positions[`n${h}p${p}`]={x:x+pw/2,y:ny+45};const z=add(g,'g',{'data-kind':'l1','data-host':h,'data-plane':p,class:'device-click'});add(z,'rect',{x,y:ny+35,width:pw,height:22,rx:3,fill:'#e5edf9',stroke:planeColors[p]});add(z,'text',{x:x+pw/2,y:ny+50,'font-size':10,'text-anchor':'middle',fill:planeColors[p]},'L1·'+(p+1))}
+  for(let p=0;p<7;p++){const x=nx+14+p*(w-28)/7,pw=(w-35)/7-3;positions[`n${h}p${p}`]={x:x+pw/2,y:ny+45,bottom:ny+57,width:pw,left:x};const z=add(g,'g',{'data-kind':'l1','data-host':h,'data-plane':p,class:'device-click'});add(z,'rect',{x,y:ny+35,width:pw,height:22,rx:3,fill:'#e5edf9',stroke:planeColors[p]});add(z,'text',{x:x+pw/2,y:ny+50,'font-size':10,'text-anchor':'middle',fill:planeColors[p]},'L1·'+(p+1))}
   for(let c=0;c<4;c++){const x=nx+14+c*(w-28)/4;positions[`n${h}cpu${c}`]={x:x+(w-40)/8,y:ny+80};const z=add(g,'g',{'data-kind':'cpu','data-host':h,'data-cpu':c,class:'device-click'});add(z,'rect',{x,y:ny+69,width:(w-40)/4,height:22,rx:3,fill:'#f0e9f5',stroke:'#c9b4d8'});add(z,'text',{x:x+(w-40)/8,y:ny+84,'font-size':11,'text-anchor':'middle',fill:'#866698'},'CPU'+c)}
   for(let chip=0;chip<8;chip++){
    const cw=(w-45)/4,x=nx+12+(chip%4)*(cw+7),y=ny+104+Math.floor(chip/4)*54;
    add(g,'rect',{x,y,width:cw,height:48,rx:5,class:'npu-outline'});
    add(g,'text',{x:x+cw/2,y:y+13,'font-size':10,'text-anchor':'middle',class:'svg-sub'},'NPU '+chip);
-   for(let a=0;a<2;a++){const d=chip*2+a,id=`n${h}:d${d}`,dw=(cw-13)/2,dx=x+4+a*(dw+5);positions[id]={x:dx+dw/2,y:y+33};const z=add(g,'g',{'data-kind':'die','data-id':id,class:'device-click'});add(z,'rect',{x:dx,y:y+21,width:dw,height:20,rx:3,class:'die-rect'+(state.sources.includes(id)?' die-source':state.targets.includes(id)?' die-target':'')});add(z,'text',{x:dx+dw/2,y:y+35,'text-anchor':'middle','font-size':11,fill:'#355368'},'D'+d)}
+   for(let a=0;a<2;a++){const d=chip*2+a,id=`n${h}:d${d}`,dw=(cw-13)/2,dx=x+4+a*(dw+5);positions[id]={x:dx+dw/2,y:y+33,top:y+21,left:dx,width:dw};const z=add(g,'g',{'data-kind':'die','data-id':id,class:'device-click'});add(z,'rect',{x:dx,y:y+21,width:dw,height:20,rx:3,class:'die-rect'+(state.sources.includes(id)?' die-source':state.targets.includes(id)?' die-target':'')});add(z,'text',{x:dx+dw/2,y:y+35,'text-anchor':'middle','font-size':11,fill:'#355368'},'D'+d)}
    add(g,'line',{x1:x+cw/2-3,y1:y+32,x2:x+cw/2+3,y2:y+32,stroke:'#986aa8','stroke-width':2});
   }
   positions[`n${h}eth`]={x:nx+w/2,y:ny+226};
@@ -54,7 +54,7 @@ function drawTopology(){
  drawLinks();applyView();
 }
 function drawLinks(){
- const root=$('links');root.replaceChildren();const fragment=document.createDocumentFragment();
+ const root=$('links'),focus=$('focusLinks');root.replaceChildren();focus.replaceChildren();const fragment=document.createDocumentFragment();const emphasize=$('emphasizeDie').checked;const focusPorts=[];
  const all=new Set([...state.sources,...state.targets]);const selectedHosts=new Set([...all].map(id=>M.endpoint(id).host));const ps=Array.from({length:7},(_,i)=>i).filter(p=>state.planeFocus==='all'||p===+state.planeFocus);
  const ubDie=new Set(),crossHosts=new Set(),sioEdges=[];
  if(result)for(const f of result.samples){
@@ -64,12 +64,24 @@ function drawLinks(){
  }
  if(result&&result.flows>64&&['alltoall','ring','allreduce'].includes(state.mode)){for(const id of all)ubDie.add(id);if(selectedHosts.size>1)for(const h of selectedHosts)crossHosts.add(h)}
  function line(a,b,color,opacity=.4,width=1.3,bend=80){if(!a||!b)return;add(fragment,'path',{d:`M${a.x},${a.y} C${a.x},${a.y-bend} ${b.x},${b.y+bend} ${b.x},${b.y}`,stroke:color,'stroke-opacity':opacity,'stroke-width':width,fill:'none',class:'chartline'})}
+ function dieLine(id,p,target,active){
+  const source=positions[id];if(!source||!target)return;
+  // Distinct schematic connectors: these positions do not assert physical pin/lane wiring.
+  const sx=source.left+3+(source.width-6)*p/6,sy=source.top;
+  const endpoint=M.endpoint(id),tx=target.left+4+(target.width-8)*endpoint.die/15,ty=target.bottom;
+  const focused=emphasize&&id===inspectedDie;
+  const parent=focused?focus:fragment;
+  const alpha=focused?1:state.allLinks?.10:emphasize?.20:.66;
+  const path=add(parent,'path',{d:`M${sx},${sy} C${sx},${sy-12} ${tx},${ty+12} ${tx},${ty}`,stroke:planeColors[p],'stroke-opacity':alpha,'stroke-width':focused?2:1.15,'vector-effect':'non-scaling-stroke',fill:'none',class:'chartline die-ub-link'+(focused?' inspected-link':''),'data-die':id,'data-plane':p,'data-connection':`${id}:p${p+1}`});
+  add(path,'title',{},`${M.label(id)} ↔ L1·${p+1} / P${p+1}（逻辑接口，非光口或SerDes lane）`);
+  if(focused)focusPorts.push({x:sx,y:sy,p});
+ }
  for(let h=1;h<=48;h++){
   if(!state.allLinks&&!selectedHosts.has(h))continue;
   for(const p of ps){
    const origin=positions[`n${h}p${p}`];
    if(state.allLinks||(state.transport==='ub'&&crossHosts.has(h)))for(let a=0;a<16;a++)line(origin,positions[`p${p}a${a}`],planeColors[p],state.allLinks?.045:.23,state.allLinks?.8:1.6);
-   for(let d=0;d<16;d++)if(state.allLinks||ubDie.has(`n${h}:d${d}`))line(positions[`n${h}:d${d}`],origin,planeColors[p],state.allLinks?.10:.57,1.4,35);
+   for(let d=0;d<16;d++)if(state.allLinks||ubDie.has(`n${h}:d${d}`))dieLine(`n${h}:d${d}`,p,origin,ubDie.has(`n${h}:d${d}`));
    if(state.cpuLinks)for(let c=0;c<4;c++)line(positions[`n${h}cpu${c}`],origin,'#bd6976',.4,1.1,20);
   }
   if(state.cpuLinks)for(let c=0;c<4;c++)for(let d=c+1;d<4;d++)line(positions[`n${h}cpu${c}`],positions[`n${h}cpu${d}`],'#9279a5',.5,1.5,20);
@@ -80,18 +92,26 @@ function drawLinks(){
  }
  for(const f of sioEdges)line(positions[f.from],positions[f.to],'#8d5ba8',.9,3,8);
  root.appendChild(fragment);
+ for(const q of focusPorts){
+  add(focus,'circle',{cx:q.x,cy:q.y,r:.8,fill:planeColors[q.p],stroke:'#fff','stroke-width':.25,class:'die-port-marker'});
+  add(focus,'text',{x:q.x,y:q.y-2.6,'text-anchor':'middle','font-size':3.4,'font-weight':750,fill:planeColors[q.p],class:'die-port-label','data-plane':q.p},String(q.p+1));
+ }
+ const count=focusPorts.length;
+ $('inspectedDieLabel').textContent=M.label(inspectedDie);
+ $('linkCountHint').textContent=count?`当前突出 ${count} / 7 条UB逻辑连接`:'当前场景未突出UB连接；可打开硬件连线详图';
 }
+
 function select(ids){const key=state.group,other=key==='sources'?'targets':'sources';const remove=ids.every(id=>state[key].includes(id));state[key]=remove?state[key].filter(id=>!ids.includes(id)):Msort([...state[key],...ids]);state[other]=state[other].filter(id=>!ids.includes(id));update()}
 function Msort(ids){return [...new Set(ids)].sort(M.compare)}
-function selectDie(id){const e=M.endpoint(id);state.host=e.host;$('host').value=e.host;select(state.granularity==='npu'?[`n${e.host}:d${e.chip*2}`,`n${e.host}:d${e.chip*2+1}`]:[id])}
+function selectDie(id){inspectedDie=id;const e=M.endpoint(id);state.host=e.host;$('host').value=e.host;select(state.granularity==='npu'?[`n${e.host}:d${e.chip*2}`,`n${e.host}:d${e.chip*2+1}`]:[id])}
 function drawPicker(){const h=state.host;$('diePicker').innerHTML=Array.from({length:8},(_,c)=>`<div class="npu-pick"><button class="chip-label" data-chip="${c}" title="选择NPU ${c}的两个die">NPU ${c}</button><div class="die-pair">${[c*2,c*2+1].map(d=>{const id=`n${h}:d${d}`;return `<button class="die-button ${state.sources.includes(id)?'source':state.targets.includes(id)?'target':''}" data-id="${id}" aria-pressed="${state.sources.includes(id)||state.targets.includes(id)}" aria-label="节点${h} NPU${c} die${d}">D${d}</button>`}).join('')}</div></div>`).join('');$('cpuPicker').innerHTML=[0,1,2,3].map(c=>`<button data-cpu="${c}">CPU ${c} · DRAM</button>`).join('')+'<button data-eth="1">CDR / 8 RoCE口</button>'}
 function inspect(kind,h,p,b,c){let title='',text='';
  if(kind==='cpu'){title=`N${h} · CPU ${c} / DRAM`;text='每CPU约160GB/s单向UB总量（论文）。图中CPU↔L1的8×30G是30GB/s的图示原始速率，不能将七条相加视为可用带宽。机内四socket为full-mesh NUMA；CPU之间每条线的带宽尚未确认。跨机Host内存DMA尚无有效实测带宽。'}
  if(kind==='l1'){title=`N${h} · L1 平面${+p+1}`;text='下接16个die，每die在此平面28GB/s；上接对应平面的16颗L2芯片，每条28GB/s，共448GB/s。上行包装为8个QSFP-DD笼口，每口双子接口。CPU也接入此层；没有证据证明CPU与NPU额外注入可超出共享上行。'}
  if(kind==='l2'){title=`L2 · P${+p+1}/B${+b+1}`;text='一台LingQu 630：两颗ASIC a/b，每颗连接48个节点。论文口径每ASIC端口28GB/s，每ASIC合计1344GB/s，每箱体2688GB/s单向端口总量。手册端口标称400G=2×200G全双工。此编号为逻辑编排，尚未取得现场端口表。'}
  if(kind==='eth'){title=`N${h} · 参数面RoCE`;text='8个400G笼口，经混合板4颗CDR接8个NPU；每个NPU有两个die，各自200Gbps RDMA接口。外部RoCE交换机不是上方56台UB设备。已测窗口NPU RoCE所查计数不增长，不等于链路不存在或所有应用都不用它。'}
- if(kind==='die'){const e=M.endpoint(h);title=M.label(h)+' · NPU '+e.chip;text='独立die：HBM 64GB / 标称1600GB/s，UB 7×28=196GB/s单向；同封装另一die的SIO连接270GB/s单向；RoCE接口200Gbps=25GB/s。两die到L2 a/b芯片的固定接线和实际选路未确认。'}
- $('inspector').innerHTML=`<h4>${esc(title)}</h4><p>${esc(text)}</p><p class="fine">来源：论文v2 §3.3 / Atlas A3白皮书 / LingQu指南</p>`;
+ if(kind==='die'){inspectedDie=h;const e=M.endpoint(h);title=M.label(h)+' · NPU '+e.chip;text='独立die：HBM 64GB / 标称1600GB/s，UB 7×28=196GB/s单向；同封装另一die的SIO连接270GB/s单向；RoCE接口200Gbps=25GB/s。两die到L2 a/b芯片的固定接线和实际选路未确认。'}
+ $('inspector').innerHTML=`<h4>${esc(title)}</h4><p>${esc(text)}</p>${kind==='die'?'<button class="link-detail-button" data-open-link-detail="1">查看此NPU连线详图 ↗</button>':''}<p class="fine">来源：论文v2 §3.3 / Atlas A3白皮书 / LingQu指南</p>`;
 }
 function readControls(){for(const key of ['mode','operation','transport','rate','background'])state[key]=$(key).value;state.planes=+$('planes').value;state.backgroundPct=+$('backgroundPct').value;state.bytes=+$('size').value*({KiB:1024,MiB:1048576,GiB:1073741824}[$('sizeUnit').value]);$('planesValue').textContent=state.planes+' / 7';$('bgValue').textContent=state.backgroundPct+'%';$('backgroundPct').disabled=!['endpoint','uplink'].includes(state.background);$('planes').disabled=state.transport==='roce';$('rate').disabled=state.transport==='roce';$('operation').disabled=['ring','alltoall','allreduce'].includes(state.mode);$('sizeLabel').textContent=state.mode==='alltoall'?'每die总发送量':state.mode==='allreduce'?'每rank张量大小':'每条die流消息';}
 function renderResult(){
@@ -113,7 +133,7 @@ function renderResult(){
  ${canRef&&ref?`<h4>同型历史${state.operation==='read'?'读':'写'}拷贝参考</h4><p class="note"><b>${fmt(ref.gbps)} GB/s</b>（${fmt(ref.min)}–${fmt(ref.max)}）<br>${ref.dies}对die · ${bytes(ref.bytes)} · 2026-11-03<br>仅历史配置参考，未验证当前选中节点。</p>`:''}</div>
  <div class="result-notes">${r.notes.filter((v,i)=>i<2||v.includes('背景')||v.includes('其他节点')||v.includes('RoCE结果')||v.includes('消息大小')||v.includes('ring')).map(v=>`<p class="note">${esc(v)}</p>`).join('')}</div>`;
 }
-function update(draw=true){readControls();$('sourceCount').textContent=state.sources.length+' die';$('targetCount').textContent=state.targets.length+' die';$('sourceNames').textContent=state.sources.map(M.label).join(', ')||'未选择';$('targetNames').textContent=state.targets.map(M.label).join(', ')||'未选择';renderResult();drawPicker();if(draw)drawTopology()}
+function update(draw=true){readControls();$('sourceCount').textContent=state.sources.length+' die';$('targetCount').textContent=state.targets.length+' die';$('sourceNames').textContent=state.sources.map(M.label).join(', ')||'未选择';$('targetNames').textContent=state.targets.map(M.label).join(', ')||'未选择';renderResult();drawPicker();if(draw)drawTopology();document.dispatchEvent(new Event('cm-scenario-change'))}
 function preset(name){state.sources=[];state.targets=[];$('mode').value='pairs';$('operation').value='read';$('transport').value='ub';$('size').value=64;$('sizeUnit').value='MiB';$('planes').value=7;$('background').value='none';$('backgroundPct').value=0;
  if(name==='pair'){state.sources=['n48:d0'];state.targets=['n42:d0']}
  if(name==='chip'){state.sources=['n48:d0','n48:d1'];state.targets=['n42:d0','n42:d1']}
@@ -122,14 +142,14 @@ function preset(name){state.sources=[];state.targets=[];$('mode').value='pairs';
  if(name==='local'){state.sources=['n48:d0'];state.targets=['n48:d2']}
  if(name==='hotspot'){state.sources=[45,46,47,48].map(h=>`n${h}:d0`);state.targets=['n42:d0'];$('mode').value='fanin'}
  if(name==='ring'){state.sources=['n48:d0','n48:d1'];state.targets=['n42:d0','n42:d1'];$('mode').value='allreduce'}
- state.host=48;$('host').value=48;update();inspect('die',state.sources[0]);toast('已载入示例；每条die流的数据量独立计算')}
+ state.host=48;inspectedDie=state.sources[0];$('host').value=48;update();inspect('die',state.sources[0]);toast('已载入示例；每条die流的数据量独立计算')}
 function evidence(){
  const rows=[['die ↔ L1，每平面','224Gbps = 28GB/s','论文v2 §3.3.1','每die7路，共196GB/s'],['NPU ↔ L1，每平面','8×56G = 448Gbps = 56GB/s','组网图＋论文双die','合并两die；不是单die56GB/s'],['L1 ↔ L2，每ASIC子链路','28GB/s（论文） / 200G（手册标称）','论文图5＋LingQu逻辑图','8笼口=16子链路；对应16颗L2芯片'],['单个L1上行总量','16×28 = 448GB/s','论文v2 §3.3.2','7 L1 → 3136GB/s / 节点'],['L2箱体全部端口总量','48×2×28 = 2688GB/s','同上，算术推导','是所有端口合计，不是一对节点专享'],['CPU ↔ L1，图中红线','8×30G = 30GB/s（图示算术）','Atlas开局指导书图3-48','CPU端点总量约160GB/s，不能合成210GB/s'],['同封装die ↔ die','270GB/s / 方向','论文v2图3','不需要L2；硬件上限不是SDMA实测'],['每die ↔ RoCE','200Gbps = 25GB/s','论文v2 §3.3.1','双die合并为NPU400G，CDR不提供UB交换'],['CPU ↔ CPU，机内','未知逐边速率','论文确认full-mesh NUMA','不拿CPU UB总量替代私有互联速率'],['跨节点CPU DRAM访问','无有效现场带宽测量','HiXL/EMS描述＋本机尝试','需显式注册/授权/同步；不证明透明缓存一致性']];
  $('capacityTable').innerHTML='<div class="table-scroll"><table><thead><tr><th>图中链路</th><th>每方向容量</th><th>依据</th><th>边界</th></tr></thead><tbody>'+rows.map(r=>'<tr>'+r.map((v,i)=>`<td>${i===1?'<b>':''}${esc(v)}${i===1?'</b>':''}</td>`).join('')+'</tr>').join('')+'</tbody></table></div>';
  const levels={confirmed:'文档确认',inference:'图示推导',derived:'算术推导',bounded:'部分确认 / 边界保留',measured:'实测观测'};
  $('facts').innerHTML=D.facts.map(f=>`<article class="fact"><span class="badge">${levels[f.level]}</span><h3>${esc(f.title)}</h3><p>${esc(f.text)}</p><small>依据：${f.sources.join(' · ')}</small></article>`).join('');
  const ms=D.measured.filter(x=>(x.variant==='longwindow')||(x.variant==='matched_cross'&&[1048576,16777216,134217728].includes(x.bytes))||(x.study==='2026-11-04'&&x.variant==='cross'));
- $('measurements').innerHTML='<div class="table-scroll"><table><thead><tr><th>实验</th><th>并发／大小</th><th>方向</th><th>payload GB/s</th><th>三次范围</th></tr></thead><tbody>'+ms.map(v=>`<tr><td>${esc(v.study)} · ${v.variant==='longwindow'?'16die长窗口':v.streams?v.streams+' streams':'单die跨机'}</td><td>${v.dies}对 / ${bytes(v.bytes)}</td><td>${v.operation===state.operation?'读':'写'}</td><td><b>${fmt(v.gbps)}</b></td><td>${fmt(v.min)}–${fmt(v.max)}</td></tr>`).join('')+'</tbody></table></div>';
+ $('measurements').innerHTML='<div class="table-scroll"><table><thead><tr><th>实验</th><th>并发／大小</th><th>方向</th><th>payload GB/s</th><th>三次范围</th></tr></thead><tbody>'+ms.map(v=>`<tr><td>${esc(v.study)} · ${v.variant==='longwindow'?'16die长窗口':v.streams?v.streams+' streams':'单die跨机'}</td><td>${v.dies}对 / ${bytes(v.bytes)}</td><td>${v.operation==='read'?'读':'写'}</td><td><b>${fmt(v.gbps)}</b></td><td>${fmt(v.min)}–${fmt(v.max)}</td></tr>`).join('')+'</tbody></table></div>';
  $('sources').innerHTML=D.sources.map(s=>`<article class="source-card"><b>${s.id} · ${esc(s.title)}</b><p>${esc(s.pages||s.scope)}</p><p>${esc(s.file)}</p>${s.url?`<a href="${esc(s.url)}" target="_blank" rel="noopener">查看公开原文 ↗</a>`:''}<p>${esc(s.scope)}</p></article>`).join('');
 }
 for(let h=1;h<=48;h++)$('host').add(new Option('N'+String(h).padStart(2,'0'),h));$('host').value=48;
@@ -140,9 +160,10 @@ $('group').addEventListener('click',e=>{const b=e.target.closest('[data-group]')
 $('granularity').addEventListener('change',e=>state.granularity=e.target.value);
 for(const id of ['mode','operation','transport','rate','size','sizeUnit','planes','background','backgroundPct'])$(id).addEventListener('input',()=>{update(false);drawLinks()});
 $('clearA').onclick=()=>{state.sources=[];update()};$('clearB').onclick=()=>{state.targets=[];update()};
-$('host').onchange=e=>{state.host=+e.target.value;drawPicker();drawTopology()};$('focusNode').onclick=()=>focusHost(state.host);$('selectNode').onclick=()=>{const ids=Array.from({length:16},(_,d)=>`n${state.host}:d${d}`),other=state.group==='sources'?'targets':'sources';state[state.group]=Msort([...state[state.group],...ids]);state[other]=state[other].filter(id=>!ids.includes(id));update()};
-$('diePicker').onclick=e=>{const die=e.target.closest('[data-id]'),chip=e.target.closest('[data-chip]');if(die){selectDie(die.dataset.id);inspect('die',die.dataset.id)}else if(chip)select([0,1].map(a=>`n${state.host}:d${+chip.dataset.chip*2+a}`))};
+$('host').onchange=e=>{state.host=+e.target.value;inspectedDie=`n${state.host}:d${M.endpoint(inspectedDie).die}`;drawPicker();drawTopology()};$('focusNode').onclick=()=>focusHost(state.host);$('selectNode').onclick=()=>{const ids=Array.from({length:16},(_,d)=>`n${state.host}:d${d}`),other=state.group==='sources'?'targets':'sources';state[state.group]=Msort([...state[state.group],...ids]);state[other]=state[other].filter(id=>!ids.includes(id));update()};
+$('diePicker').onclick=e=>{const die=e.target.closest('[data-id]'),chip=e.target.closest('[data-chip]');if(die){selectDie(die.dataset.id);inspect('die',die.dataset.id)}else if(chip){inspectedDie=`n${state.host}:d${+chip.dataset.chip*2}`;select([0,1].map(a=>`n${state.host}:d${+chip.dataset.chip*2+a}`))}};
 $('cpuPicker').onclick=e=>{if(e.target.dataset.cpu!==undefined)inspect('cpu',state.host,0,0,+e.target.dataset.cpu);if(e.target.dataset.eth)inspect('eth',state.host)};
+$('emphasizeDie').onchange=()=>drawLinks();
 for(const id of ['allLinks','cpuLinks'])$(id).onchange=e=>{state[id]=e.target.checked;drawLinks()};$('planeFocus').onchange=e=>{state.planeFocus=e.target.value;drawLinks()};
 $('layout').onchange=e=>{state.layout=e.target.value;drawTopology();fit();$('canvasHint').textContent=state.layout==='racks'?'典型12＋4机柜示意 · 节点编号到实际柜位未核验':'示意布局 · 未核验实际机柜位置与端口接线表'};
 $('zoomIn').onclick=()=>zoom(1.45);$('zoomOut').onclick=()=>zoom(1/1.45);$('fit').onclick=fit;
@@ -154,5 +175,5 @@ $('topology').addEventListener('pointercancel',()=>drag=null);
 $('export').onclick=()=>{if(!result){toast('请先配置有效场景');return}const data={appVersion:D.version,created:new Date().toISOString(),scenario:state,result,assumptions:result.notes,sources:D.sources,nonFiniteNote:'Infinity is serialized as string when a resource is fully occupied.'};const blob=new Blob([JSON.stringify(data,(k,v)=>typeof v==='number'&&!Number.isFinite(v)?String(v):v,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='CM384-bandwidth-scenario.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)};
 new ResizeObserver(()=>{if(autoFit&&$('explore').classList.contains('active'))fit()}).observe($('svgShell'));
 evidence();update();fit();inspect('die','n48:d0');
-window.CM_APP={state,get result(){return result},preset,fit,focusHost};
+window.CM_APP={state,get result(){return result},get inspectedDie(){return inspectedDie},get viewScale(){return view.k},preset,fit,focusHost};
 })();
